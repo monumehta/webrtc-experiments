@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <title>Audio Conference</title>
+  <script src="js/RTCMultiConnection.js"></script>  
+  <script src="js/adapter.js"></script>
+  <script src="js/socket.io.js"></script>
+  <script src="js/hark.js"></script>
+<script src="js/getHTMLMediaElement.js"></script>
+</head>
+<body>
+
+  <section class="icon-section" style="float:right">
+
+    <button class="btn btn-info" style="display:none" id="open-or-join-room" >ऑडियो चैट शुरू करें</button>
+
+    <button class="btn btn-info"  id="leave">चैट छोड़े</button>
+
+    <button class="btn btn-success" style="display:none;" id="mute" >माइक बंद करें</button>
+
+    <button class="btn btn-success" style="animation: myanimation 2s infinite;" id="unmute">माइक चालू करें</button>
+    <div id="audios-container"></div>
+  </section>
+
+<script>
+document.getElementById('open-or-join-room').onclick = function() {
+  if (navigator.onLine) {
+      connection.openOrJoin(roomid, function(isRoomExist, roomid) {    
+      document.getElementById('open-or-join-room').style.display = 'none';
+      document.getElementById('leave').style.display = 'inline-block';
+      document.getElementById('mute').style.display = 'inline-block';    
+    });
+  }
+};
+
+document.getElementById('leave').onclick = function() {
+  document.getElementById('leave').style.display = 'none';
+  var localStream = connection.attachStreams[0];
+  connection.leave();
+  connection.closeSocket();
+};
+
+document.getElementById('mute').onclick = function() {
+  var localStream = connection.attachStreams[0];
+  localStream.mute('both');
+  document.getElementById('mute').style.display = 'none';
+  document.getElementById('unmute').style.display = 'inline-block';
+};
+
+document.getElementById('unmute').onclick = function() {
+  var localStream = connection.attachStreams[0];
+  localStream.unmute('both');
+  document.getElementById('mute').style.display = 'inline-block';
+  document.getElementById('unmute').style.display = 'none';
+};
+
+window.addEventListener('offline', function(e) {
+  document.getElementById('leave').style.display = 'none';
+  var localStream = connection.attachStreams[0];
+  connection.leave();
+  connection.closeSocket();
+}, false);
+
+var connection = new RTCMultiConnection();
+
+connection.socketURL = 'https://dev2.money91.com/';  
+
+connection.socketMessageEvent = 'audio-conference-demo';
+connection.session = {
+    audio: true,
+    video: false
+};
+
+connection.iceServers = [];
+connection.iceServers.push({
+    urls: 'stun:35.154.1.196:3478'
+});
+connection.iceServers.push({
+    urls: 'turn:35.154.1.196:3478',
+    credential: 'test',
+    username: 'test',
+    password:'test'
+});
+
+connection.mediaConstraints = {
+    audio: true,
+    video: false
+};
+
+connection.sdpConstraints.mandatory = {
+    OfferToReceiveAudio: true,
+    OfferToReceiveVideo: false
+};
+
+connection.onstream = function(event) {
+    var width = parseInt(connection.audiosContainer.clientWidth / 2) - 20;
+    var mediaElement = getHTMLMediaElement(event.mediaElement, {
+        title: event.userid,
+        buttons: ['full-screen'],
+        width: width,
+        showOnMouseEnter: false
+    });
+
+    connection.audiosContainer.appendChild(mediaElement);
+
+    setTimeout(function() {
+        mediaElement.media.play();
+    }, 5000);
+
+    mediaElement.id = event.streamid;
+
+};
+
+connection.onvolumechange = function(event) {
+  event.mediaElement.style.borderWidth = event.volume;
+};
+
+connection.onstreamended = function(event) {
+    var mediaElement = document.getElementById(event.streamid);
+    if (mediaElement) {
+        mediaElement.parentNode.removeChild(mediaElement);
+    }
+};
+
+connection.onSocketDisconnect = function(event) {
+  document.getElementById('leave').style.display = 'none';
+  document.getElementById('mute').style.display = 'none';
+  document.getElementById('unmute').style.display = 'none';
+  document.getElementById('open-or-join-room').style.display = 'inline-block';
+};
+
+//start on document load
+let roomid = '12345s6';
+  connection.openOrJoin(roomid, function(isRoomExist, roomid) {        
+    var localStream = connection.attachStreams[0];
+    localStream.mute('both');
+  });
+
+</script>
+</body>
+</html>

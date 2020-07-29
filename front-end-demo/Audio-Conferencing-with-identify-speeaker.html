@@ -1,0 +1,162 @@
+
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <title>Audio Conferencing</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
+</head>
+<body>
+
+  <section class="make-center">
+    <input type="text" id="room-id" value="123456" autocorrect=off autocapitalize=off size=20>
+    <button id="open-room">Open Room</button>
+    <button id="join-room">Join Room</button>
+    <button id="open-or-join-room">Auto Open Or Join Room</button>
+
+
+    <div id="audios-container"  style="display: none"></div>
+  </section>
+
+    <script src="js/RTCMultiConnection.js"></script>  
+    <script src="js/adapter.js"></script>
+    <script src="js/socket.io.js"></script>
+    <script src="js/getHTMLMediaElement.js"></script>
+    <script src="js/hark.js"></script>
+<script>
+// ......................................................
+// .......................UI Code........................
+// ......................................................
+
+
+document.getElementById('open-room').onclick = function() {
+    disableInputButtons();
+    connection.open(document.getElementById('room-id').value, function() {
+        console.log('room open')
+    });
+};
+
+document.getElementById('join-room').onclick = function() {
+    disableInputButtons();
+    connection.join(document.getElementById('room-id').value);
+};
+
+document.getElementById('open-or-join-room').onclick = function() {
+    disableInputButtons();
+    connection.openOrJoin(document.getElementById('room-id').value, function(isRoomExist, roomid) {
+        console.log('room open')
+    });
+};
+
+// ......................................................
+// ..................RTCMultiConnection Code.............
+// ......................................................
+
+var connection = new RTCMultiConnection();
+
+// by default, socket.io server is assumed to be deployed on your own URL
+connection.socketURL = 'https://dev2.money91.com/';  
+
+connection.socketMessageEvent = 'audio-conference-demo';
+
+connection.session = {
+    audio: true,
+    video: false
+};
+
+connection.mediaConstraints = {
+    audio: true,
+    video: false
+};
+
+connection.sdpConstraints.mandatory = {
+    OfferToReceiveAudio: true,
+    OfferToReceiveVideo: false
+};
+
+connection.audiosContainer = document.getElementById('audios-container');
+connection.onstream = function(event) {
+    var width = parseInt(connection.audiosContainer.clientWidth / 2) - 20;
+    var mediaElement = getHTMLMediaElement(event.mediaElement, {
+        title: event.userid,
+        buttons: ['full-screen'],
+        width: width,
+        showOnMouseEnter: false
+    });
+
+    connection.audiosContainer.appendChild(mediaElement);
+
+    setTimeout(function() {
+        mediaElement.media.play();
+    }, 5000);
+
+    mediaElement.id = event.streamid;
+
+    initHark({
+      stream: event.stream,
+      streamedObject: event,
+      connection: connection
+  });
+};
+
+connection.onspeaking = function (e) {
+  // e.streamid, e.userid, e.stream, etc.
+  console.log('speaking',e.userid)
+};
+
+connection.onsilence = function (e) {
+  // e.streamid, e.userid, e.stream, etc.
+  //console.log('silent',e.userid)
+};
+
+connection.onvolumechange = function(e) {
+  //console.log('silent',e.volume)
+};
+
+function initHark(args) {
+  if (!window.hark) {
+      throw 'Please link hark.js';
+      return;
+  }
+
+  var connection = args.connection;
+  var streamedObject = args.streamedObject;
+  var stream = args.stream;
+
+  var options = {};
+  var speechEvents = hark(stream, options);
+
+  speechEvents.on('speaking', function() {
+      connection.onspeaking(streamedObject);
+  });
+
+  speechEvents.on('stopped_speaking', function() {
+      connection.onsilence(streamedObject);
+  });
+
+  speechEvents.on('volume_change', function(volume, threshold) {
+      streamedObject.volume = volume;
+      streamedObject.threshold = threshold;
+      connection.onvolumechange(streamedObject);
+  });
+}
+
+connection.onstreamended = function(event) {
+    var mediaElement = document.getElementById(event.streamid);
+    if (mediaElement) {
+        mediaElement.parentNode.removeChild(mediaElement);
+    }
+};
+
+function disableInputButtons() {
+    document.getElementById('open-or-join-room').disabled = true;
+    document.getElementById('open-room').disabled = true;
+    document.getElementById('join-room').disabled = true;
+    document.getElementById('room-id').disabled = true;
+}
+
+</script>
+
+  <script src="https://cdn.webrtc-experiment.com/common.js"></script>
+</body>
+</html>

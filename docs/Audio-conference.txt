@@ -1,0 +1,144 @@
+// Instruction for front-end
+// include iibraries
+<script src="js/RTCMultiConnection.js"></script>  
+<script src="js/adapter.js"></script>
+<script src="js/jquery.min.js"></script>
+<script src="js/socket.io.js"></script>
+<script src="js/getHTMLMediaElement.js"></script>
+<script src="js/hark.js"></script>
+
+//create div for media elemen
+<div id="audios-container"></div>
+
+<script>
+    //define roomid for audio chat
+    let roomid = 123456
+
+    // ......................................................
+    // ..................RTCMultiConnection Code.............
+    // ......................................................
+
+    var connection = new RTCMultiConnection();
+    
+    // by default, socket.io server is assumed to be deployed on your own URL
+    // we are updating server url for our webrtc-sdk server
+    connection.socketURL = 'https://dev2.money91.com/';  
+    
+    //set input
+    connection.socketMessageEvent = 'audio-conference-demo';
+    connection.session = {
+        audio: true,
+        video: false
+    };
+    
+    // first step, ignore default STUN+TURN servers
+    connection.iceServers = [];
+
+    // second step, set STUN url
+    connection.iceServers.push({
+        urls: 'stun:35.154.1.196:3478'
+    });
+
+    // last step, set TURN url (recommended)
+    connection.iceServers.push({
+        urls: 'turn:35.154.1.196:3478',
+        credential: 'test',
+        username: 'test',
+        password:'test'
+    });
+    
+    //set media media constraints 
+    connection.mediaConstraints = {
+        audio: true,
+        video: false
+    };
+    
+    connection.sdpConstraints.mandatory = {
+        OfferToReceiveAudio: true,
+        OfferToReceiveVideo: false
+    };
+    
+    // ignore media element on webpage
+    connection.audiosContainer = document.getElementById('audios-container');
+    connection.onstream = function(event) {
+        var width = parseInt(connection.audiosContainer.clientWidth / 2) - 20;
+        var mediaElement = getHTMLMediaElement(event.mediaElement, {
+            title: event.userid,
+            buttons: ['full-screen'],
+            width: width,
+            showOnMouseEnter: false
+        });
+
+        connection.audiosContainer.appendChild(mediaElement);
+
+        setTimeout(function() {
+        mediaElement.media.play();
+    }, 5000);
+
+        mediaElement.id = event.streamid;
+    };
+
+    connection.onstreamended = function(event) {
+        var mediaElement = document.getElementById(event.streamid);
+        if (mediaElement) {
+            mediaElement.parentNode.removeChild(mediaElement);
+        }
+    };
+    
+    connection.onSocketDisconnect = function(event) {
+        $("#leave").hide();
+        $("#mute").hide();
+        $("#unmute").hide();
+        $("#open-or-join-room").show();
+      };
+
+    // join or open a chat room if room already opened then join function will be call from back-end
+    // else open function will be call 
+    $("#open-or-join-room").click(function(){
+        connection.openOrJoin(roomid, function(isRoomExist, roomid) {    
+        $("#open-or-join-room").hide();
+        $("#leave").show();
+        $("#mute").show();
+        });
+    });
+
+    //or we can call open/join funciton form front-end
+    connection.open(roomid, function() {
+        showRoomURL(connection.sessionid);
+    });
+
+    connection.join(roomid);
+        
+    // function for leave audio chat
+    $("#leave").click(function(){
+    $("#leave").hide();
+    var localStream = connection.attachStreams[0];
+    connection.leave();
+    connection.closeSocket();
+    });
+    
+    //function for mute mic
+    $("#mute").click(function(){
+    var localStream = connection.attachStreams[0];
+    localStream.mute('both');
+    $("#mute").hide();
+    $("#unmute").show();
+    });
+    
+    //function for unmute mic
+    $("#unmute").click(function(){
+    var localStream = connection.attachStreams[0];
+    localStream.unmute('both');
+    $("#mute").show();
+    $("#unmute").hide();
+    });
+    
+    //handler function if user goes offline
+    window.addEventListener('offline', function(e) {
+    $("#leave").hide();
+    var localStream = connection.attachStreams[0];
+    connection.leave();
+    connection.closeSocket();
+    }, false);
+
+</script>  

@@ -1,0 +1,54 @@
+First of all, link hark.js:
+
+<script src="https://cdn.webrtc-experiment.com/hark.js"></script>
+Now paste following code in your HTML/PHP files:
+
+connection.onstream = function(event) {
+    initHark({
+        stream: event.stream,
+        streamedObject: event,
+        connection: connection
+    });
+};
+
+connection.onspeaking = function (e) {
+    // e.streamid, e.userid, e.stream, etc.
+    e.mediaElement.style.border = '1px solid red';
+};
+
+connection.onsilence = function (e) {
+    // e.streamid, e.userid, e.stream, etc.
+    e.mediaElement.style.border = '';
+};
+
+connection.onvolumechange = function(event) {
+    event.mediaElement.style.borderWidth = event.volume;
+};
+
+function initHark(args) {
+    if (!window.hark) {
+        throw 'Please link hark.js';
+        return;
+    }
+
+    var connection = args.connection;
+    var streamedObject = args.streamedObject;
+    var stream = args.stream;
+
+    var options = {};
+    var speechEvents = hark(stream, options);
+
+    speechEvents.on('speaking', function() {
+        connection.onspeaking(streamedObject);
+    });
+
+    speechEvents.on('stopped_speaking', function() {
+        connection.onsilence(streamedObject);
+    });
+
+    speechEvents.on('volume_change', function(volume, threshold) {
+        streamedObject.volume = volume;
+        streamedObject.threshold = threshold;
+        connection.onvolumechange(streamedObject);
+    });
+}
